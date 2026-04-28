@@ -69,6 +69,20 @@ register_activation_hook( __FILE__, 'activate_wptelegram_messaging' );
 register_deactivation_hook( __FILE__, 'deactivate_wptelegram_messaging' );
 
 /**
+ * Add settings link to plugins page.
+ *
+ * @since 1.0.0
+ * @param array $links Plugin action links.
+ * @return array
+ */
+function wptelegram_messaging_action_links( $links ) {
+	$settings_link = '<a href="' . admin_url( 'admin.php?page=wptelegram-messaging' ) . '">' . esc_html__( 'Settings', 'wptelegram-messaging' ) . '</a>';
+	array_unshift( $links, $settings_link );
+	return $links;
+}
+add_filter( 'plugin_action_links_' . WPTELEGRAM_MESSAGING_BASENAME, 'wptelegram_messaging_action_links' );
+
+/**
  * Begins execution of the plugin.
  *
  * Since everything within the plugin is registered via hooks,

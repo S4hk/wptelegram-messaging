@@ -73,7 +73,7 @@ class Admin {
 	 */
 	public function add_admin_menu() {
 		add_submenu_page(
-			'wptelegram-login', // Parent menu slug from WP Telegram Login
+			'wptelegram', // Parent menu slug from WP Telegram Core
 			esc_html__( 'Welcome Messages', 'wptelegram-messaging' ), // Page title
 			esc_html__( 'Welcome', 'wptelegram-messaging' ), // Menu title
 			'manage_options', // Capability
