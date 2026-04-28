@@ -123,6 +123,17 @@ class Admin {
 			'wptelegram_messaging_settings_group',
 			'wptelegram_messaging_main'
 		);
+
+		// Add hooks for user list
+		add_filter( 'manage_users_columns', [ $this, 'add_user_columns' ] );
+		add_filter( 'manage_users_custom_column', [ $this, 'render_user_column' ], 10, 3 );
+		add_filter( 'user_row_actions', [ $this, 'add_user_row_actions' ], 10, 2 );
+
+		// AJAX handler for manual sending
+		add_action( 'wp_ajax_wptelegram_messaging_send_manual', [ $this, 'handle_manual_send' ] );
+
+		// Enqueue scripts
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_scripts' ] );
 	}
 
 	/**
@@ -304,6 +315,11 @@ class Admin {
 						<td>My Awesome Blog</td>
 					</tr>
 					<tr>
+						<td><code>{site_description}</code></td>
+						<td><?php esc_html_e( 'Your website tagline/description', 'wptelegram-messaging' ); ?></td>
+						<td>Just another WordPress site</td>
+					</tr>
+					<tr>
 						<td><code>{user_name}</code></td>
 						<td><?php esc_html_e( 'User display name', 'wptelegram-messaging' ); ?></td>
 						<td>John Doe</td>
@@ -333,9 +349,145 @@ class Admin {
 						<td><?php esc_html_e( 'Your website URL', 'wptelegram-messaging' ); ?></td>
 						<td>https://example.com</td>
 					</tr>
+					<tr>
+						<td><code>{admin_email}</code></td>
+						<td><?php esc_html_e( 'Admin email address', 'wptelegram-messaging' ); ?></td>
+						<td>admin@example.com</td>
+					</tr>
 				</tbody>
 			</table>
 		</div>
 		<?php
+	}
+	/**
+	 * Add custom column to users table.
+	 *
+	 * @since    1.0.0
+	 * @param array $columns The existing columns.
+	 * @return array
+	 */
+	public function add_user_columns( $columns ) {
+		$columns['wptelegram_welcome'] = esc_html__( 'Welcome Sent', 'wptelegram-messaging' );
+		return $columns;
+	}
+
+	/**
+	 * Render custom column content.
+	 *
+	 * @since    1.0.0
+	 * @param string $output      The column output.
+	 * @param string $column_name The column name.
+	 * @param int    $user_id     The user ID.
+	 * @return string
+	 */
+	public function render_user_column( $output, $column_name, $user_id ) {
+		if ( 'wptelegram_welcome' !== $column_name ) {
+			return $output;
+		}
+
+		$sent = get_user_meta( $user_id, '_wptelegram_messaging_sent', true );
+
+		if ( $sent ) {
+			$time = get_user_meta( $user_id, '_wptelegram_messaging_sent_time', true );
+			$output = '<span class="dashicons dashicons-yes-alt" style="color: #46b450;" title="' . esc_attr( $time ) . '"></span>';
+			$output .= ' <small>' . esc_html( date_i18n( get_option( 'date_format' ), strtotime( $time ) ) ) . '</small>';
+		} else {
+			$failed = get_user_meta( $user_id, '_wptelegram_messaging_failed', true );
+			if ( $failed ) {
+				$output = '<span class="dashicons dashicons-warning" style="color: #dc3232;" title="' . esc_attr( $failed ) . '"></span>';
+				$output .= ' <small>' . esc_html__( 'Failed', 'wptelegram-messaging' ) . '</small>';
+			} else {
+				$output = '<span class="dashicons dashicons-minus" style="color: #ccc;"></span>';
+			}
+		}
+
+		return $output;
+	}
+
+	/**
+	 * Add row actions to users table.
+	 *
+	 * @since    1.0.0
+	 * @param array    $actions The existing actions.
+	 * @param \WP_User $user    The user object.
+	 * @return array
+	 */
+	public function add_user_row_actions( $actions, $user ) {
+		$telegram_id = get_user_meta( $user->ID, WPTELEGRAM_USER_ID_META_KEY, true );
+
+		if ( ! empty( $telegram_id ) && current_user_can( 'manage_options' ) ) {
+			$nonce = wp_create_nonce( 'wptelegram_messaging_manual_send_' . $user->ID );
+			$url   = admin_url( 'admin-ajax.php?action=wptelegram_messaging_send_manual&user_id=' . $user->ID . '&_wpnonce=' . $nonce );
+
+			$actions['send_telegram_welcome'] = sprintf(
+				'<a href="%s" class="wptelegram-messaging-send-manual" data-user-id="%d" data-nonce="%s">%s</a>',
+				esc_url( $url ),
+				$user->ID,
+				$nonce,
+				esc_html__( 'Send Welcome', 'wptelegram-messaging' )
+			);
+		}
+
+		return $actions;
+	}
+
+	/**
+	 * Handle AJAX request for manual message sending.
+	 *
+	 * @since    1.0.0
+	 */
+	public function handle_manual_send() {
+		$user_id = isset( $_GET['user_id'] ) ? absint( $_GET['user_id'] ) : 0;
+		$nonce   = isset( $_GET['_wpnonce'] ) ? $_GET['_wpnonce'] : '';
+
+		if ( ! wp_verify_nonce( $nonce, 'wptelegram_messaging_manual_send_' . $user_id ) ) {
+			wp_send_json_error( [ 'message' => __( 'Invalid security token.', 'wptelegram-messaging' ) ] );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'wptelegram-messaging' ) ] );
+		}
+
+		// Use the Main class to send the message
+		$main = \WPTelegram\Messaging\includes\Main::instance();
+		
+		// Force send even if already sent
+		delete_user_meta( $user_id, '_wptelegram_messaging_sent' );
+		
+		$main->send_welcome_on_login( $user_id );
+
+		$sent = get_user_meta( $user_id, '_wptelegram_messaging_sent', true );
+
+		if ( $sent ) {
+			wp_send_json_success( [ 'message' => __( 'Welcome message sent successfully!', 'wptelegram-messaging' ) ] );
+		} else {
+			$failed = get_user_meta( $user_id, '_wptelegram_messaging_failed', true );
+			$error  = get_user_meta( $user_id, '_wptelegram_messaging_error', true );
+			$msg    = $failed ? $failed : ( $error ? $error : __( 'Failed to send message. Check if bot is started.', 'wptelegram-messaging' ) );
+			wp_send_json_error( [ 'message' => $msg ] );
+		}
+	}
+
+	/**
+	 * Enqueue admin scripts.
+	 *
+	 * @since    1.0.0
+	 * @param string $hook The current admin page hook.
+	 */
+	public function enqueue_scripts( $hook ) {
+		if ( 'users.php' !== $hook ) {
+			return;
+		}
+
+		wp_enqueue_script(
+			$this->plugin_name . '-admin',
+			WPTELEGRAM_MESSAGING_URL . '/assets/js/admin.js',
+			[ 'jquery' ],
+			$this->version,
+			true
+		);
+
+		// Add some styles for the 'updating' state
+		wp_add_inline_style( 'common', '.wptelegram-messaging-send-manual.updating { opacity: 0.5; pointer-events: none; }' );
 	}
 }

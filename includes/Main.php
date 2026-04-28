@@ -228,6 +228,14 @@ class Main {
 		// Replace placeholders.
 		$message = $this->replace_placeholders( $message, $user );
 
+		/**
+		 * Filter the welcome message text before sending.
+		 *
+		 * @param string   $message The message text.
+		 * @param \WP_User $user    The user object.
+		 */
+		$message = apply_filters( 'wptelegram_messaging_welcome_message', $message, $user );
+
 		// Send message.
 		$this->send_telegram_message( $telegram_user_id, $message, $bot_token, $user_id );
 	}
@@ -269,13 +277,15 @@ class Main {
 	 */
 	private function replace_placeholders( $message, $user ) {
 		$replacements = [
-			'{site_name}'   => get_bloginfo( 'name' ),
-			'{user_name}'   => $user->display_name,
-			'{user_email}'  => $user->user_email,
-			'{user_login}'  => $user->user_login,
-			'{first_name}'  => ! empty( $user->first_name ) ? $user->first_name : $user->display_name,
-			'{last_name}'   => ! empty( $user->last_name ) ? $user->last_name : '',
-			'{site_url}'    => home_url(),
+			'{site_name}'        => get_bloginfo( 'name' ),
+			'{site_description}' => get_bloginfo( 'description' ),
+			'{user_name}'        => $user->display_name,
+			'{user_email}'       => $user->user_email,
+			'{user_login}'       => $user->user_login,
+			'{first_name}'       => ! empty( $user->first_name ) ? $user->first_name : $user->display_name,
+			'{last_name}'        => ! empty( $user->last_name ) ? $user->last_name : '',
+			'{site_url}'         => home_url(),
+			'{admin_email}'      => get_option( 'admin_email' ),
 		];
 
 		/**
