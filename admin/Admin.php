@@ -74,8 +74,8 @@ class Admin {
 	public function add_admin_menu() {
 		add_submenu_page(
 			'wptelegram', // Parent menu slug from WP Telegram Core
-			esc_html__( 'Welcome Messages', 'wptelegram-messaging' ), // Page title
-			esc_html__( 'Welcome', 'wptelegram-messaging' ), // Menu title
+			esc_html__( 'Telegram Messaging', 'wptelegram-messaging' ), // Page title
+			esc_html__( 'Telegram Messaging', 'wptelegram-messaging' ), // Menu title
 			'manage_options', // Capability
 			'wptelegram-messaging', // Menu slug
 			[ $this, 'render_settings_page' ] // Callback
@@ -270,10 +270,7 @@ class Admin {
 					<p>
 						<?php 
 						echo wp_kses_post(
-							sprintf(
-								__( '<strong>Bot Token not configured.</strong> Please configure a valid Telegram bot token in <a href="%s">WP Telegram Login settings</a>.', 'wptelegram-messaging' ),
-								esc_url( admin_url( 'edit.php?post_type=wptelegram_chat&page=wptelegram-login' ) )
-							)
+							__( '<strong>Bot Token not configured.</strong> Please configure a valid Telegram bot token in WP Telegram or WP Telegram Login settings.', 'wptelegram-messaging' )
 						);
 						?>
 					</p>

@@ -204,13 +204,21 @@ class Main {
 			return;
 		}
 
-		// Get bot token from WP Telegram Login plugin.
-		if ( ! function_exists( 'WPTG_Login' ) ) {
-			return;
+		// Get bot token.
+		$bot_token = '';
+		
+		// Try WP Telegram Login first.
+		if ( function_exists( 'WPTG_Login' ) ) {
+			$bot_token = WPTG_Login()->options()->get( 'bot_token' );
 		}
 
-		$bot_token = WPTG_Login()->options()->get( 'bot_token' );
+		// Try WP Telegram core if still empty.
+		if ( empty( $bot_token ) && function_exists( 'WPTG' ) ) {
+			$bot_token = WPTG()->options()->get( 'bot_token' );
+		}
+
 		if ( empty( $bot_token ) ) {
+			update_user_meta( $user_id, '_wptelegram_messaging_failed', __( 'Bot token not found in settings.', 'wptelegram-messaging' ) );
 			return;
 		}
 
