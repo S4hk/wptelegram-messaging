@@ -1,0 +1,148 @@
+# WPML Translation File
+# Copyright (C) YEAR WP Socio
+# This file is distributed under the same license as the WP Telegram Welcome package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: WP Telegram Welcome 1.0.0\n"
+"Report-Msgid-Bugs-To: https://wpsocio.com\n"
+"POT-Creation-Date: 2024-01-01 00:00:00+0000\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language-Team: WP Socio\n"
+
+#: admin/Admin.php:52
+msgctxt "Page title"
+msgid "Welcome Messages"
+msgstr ""
+
+#: admin/Admin.php:53
+msgctxt "Menu title"
+msgid "Welcome"
+msgstr ""
+
+#: admin/Admin.php:70
+msgctxt "Settings section"
+msgid "Welcome Message Settings"
+msgstr ""
+
+#: admin/Admin.php:78
+msgid "Enable Welcome Messages"
+msgstr ""
+
+#: admin/Admin.php:87
+msgid "Welcome Message"
+msgstr ""
+
+#: admin/Admin.php:99
+msgid "Configure automatic welcome messages for users who register via Telegram Login."
+msgstr ""
+
+#: admin/Admin.php:101
+msgid "Supported placeholders: {site_name}, {user_name}, {user_email}, {user_login}, {first_name}, {last_name}, {site_url}"
+msgstr ""
+
+#: admin/Admin.php:125
+msgid "Send welcome messages to newly registered users"
+msgstr ""
+
+#: admin/Admin.php:129
+msgid "When disabled, no welcome messages will be sent. Existing messages already sent will not be affected."
+msgstr ""
+
+#: admin/Admin.php:146
+msgid "Enter your custom welcome message here. Leave empty to use default message."
+msgstr ""
+
+#: admin/Admin.php:149
+msgid "Leave empty to use the default welcome message. Supports HTML tags and the placeholders listed above."
+msgstr ""
+
+#: admin/Admin.php:153
+msgid "Example Messages"
+msgstr ""
+
+#: admin/Admin.php:159
+msgid "Example 1 - Simple"
+msgstr ""
+
+#: admin/Admin.php:162
+msgid "Example 2 - With Emoji"
+msgstr ""
+
+#: admin/Admin.php:165
+msgid "Example 3 - HTML Formatted"
+msgstr ""
+
+#: admin/Admin.php:179
+msgid "WP Telegram Welcome"
+msgstr ""
+
+#: admin/Admin.php:181
+msgid "You do not have sufficient permissions to access this page."
+msgstr ""
+
+#: admin/Admin.php:186
+msgid "<strong>WP Telegram Login plugin is required.</strong> Please install and activate WP Telegram Login plugin to use this feature."
+msgstr ""
+
+#: admin/Admin.php:201
+msgid "<strong>Bot Token not configured.</strong> Please configure a valid Telegram bot token in <a href=\"%s\">WP Telegram Login settings</a>."
+msgstr ""
+
+#: admin/Admin.php:219
+msgid "Configure automatic welcome messages for users who register via WP Telegram Login."
+msgstr ""
+
+#: admin/Admin.php:234
+msgid "Available Placeholders"
+msgstr ""
+
+#: admin/Admin.php:239
+msgid "Placeholder"
+msgstr ""
+
+#: admin/Admin.php:240
+msgid "Description"
+msgstr ""
+
+#: admin/Admin.php:241
+msgid "Example"
+msgstr ""
+
+#: admin/Admin.php:246
+msgid "Your website name"
+msgstr ""
+
+#: admin/Admin.php:252
+msgid "User display name"
+msgstr ""
+
+#: admin/Admin.php:258
+msgid "User first name"
+msgstr ""
+
+#: admin/Admin.php:264
+msgid "User last name"
+msgstr ""
+
+#: admin/Admin.php:270
+msgid "User email address"
+msgstr ""
+
+#: admin/Admin.php:276
+msgid "User login username"
+msgstr ""
+
+#: admin/Admin.php:282
+msgid "Your website URL"
+msgstr ""
+
+#: includes/Main.php:182
+msgid "🎉 Welcome to %s, %s!\n\nThank you for registering. We're excited to have you on board. Feel free to explore our website and get in touch if you have any questions."
+msgstr ""
+
+#: wptelegram-welcome.php:13
+msgid "Send personalized welcome messages to users who register via WP Telegram Login. Includes customizable message template and enable/disable toggle."
+msgstr ""
