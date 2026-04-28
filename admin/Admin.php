@@ -245,7 +245,7 @@ class Admin {
 		if ( ! function_exists( 'WPTG_Login' ) ) {
 			?>
 			<div class="wrap">
-				<h1><?php esc_html_e( 'WP Telegram Messaging', 'wptelegram-messaging' ); ?></h1>
+				<h1><?php esc_html_e( 'Telegram Messaging', 'wptelegram-messaging' ); ?></h1>
 				<div class="notice notice-error">
 					<p>
 						<?php 
@@ -265,7 +265,7 @@ class Admin {
 		if ( empty( $bot_token ) ) {
 			?>
 			<div class="wrap">
-				<h1><?php esc_html_e( 'WP Telegram Messaging', 'wptelegram-messaging' ); ?></h1>
+				<h1><?php esc_html_e( 'Telegram Messaging', 'wptelegram-messaging' ); ?></h1>
 				<div class="notice notice-warning">
 					<p>
 						<?php 
@@ -281,7 +281,7 @@ class Admin {
 
 		?>
 		<div class="wrap">
-			<h1><?php esc_html_e( 'WP Telegram Messaging', 'wptelegram-messaging' ); ?></h1>
+			<h1><?php esc_html_e( 'Telegram Messaging', 'wptelegram-messaging' ); ?></h1>
 			<p style="font-size: 14px; color: #666;">
 				<?php esc_html_e( 'Configure automatic welcome messages for users who register via WP Telegram Login.', 'wptelegram-messaging' ); ?>
 			</p>
@@ -451,7 +451,7 @@ class Admin {
 		// Force send even if already sent
 		delete_user_meta( $user_id, '_wptelegram_messaging_sent' );
 		
-		$main->send_welcome_on_login( $user_id );
+		$main->send_welcome_on_login( $user_id, true );
 
 		$sent = get_user_meta( $user_id, '_wptelegram_messaging_sent', true );
 

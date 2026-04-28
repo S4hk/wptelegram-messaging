@@ -7,7 +7,7 @@
  * @package           WPTelegram\Messaging
  *
  * @wordpress-plugin
- * Plugin Name:       WP Telegram Messaging
+ * Plugin Name:       Telegram Messaging
  * Plugin URI:        https://github.com/S4hk/wptelegram-messaging
  * Description:       Send personalized messages to users who register via WP Telegram Login. Includes customizable message template and enable/disable toggle.
  * Version:           1.0.0

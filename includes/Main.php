@@ -186,9 +186,9 @@ class Main {
 	 * @since    1.0.0
 	 * @param int $user_id The WordPress user ID.
 	 */
-	public function send_welcome_on_login( $user_id ) {
+	public function send_welcome_on_login( $user_id, $force = false ) {
 		// Check if feature is enabled.
-		if ( ! $this->options->get( 'enable_welcome' ) ) {
+		if ( ! $force && ! $this->options->get( 'enable_welcome' ) ) {
 			return;
 		}
 
@@ -201,6 +201,7 @@ class Main {
 		// Get Telegram user ID from meta.
 		$telegram_user_id = get_user_meta( $user_id, WPTELEGRAM_USER_ID_META_KEY, true );
 		if ( empty( $telegram_user_id ) ) {
+			update_user_meta( $user_id, '_wptelegram_messaging_failed', __( 'User does not have a connected Telegram account.', 'wptelegram-messaging' ) );
 			return;
 		}
 
@@ -223,7 +224,7 @@ class Main {
 		}
 
 		// Check if welcome already sent.
-		if ( get_user_meta( $user_id, '_wptelegram_messaging_sent', true ) ) {
+		if ( ! $force && get_user_meta( $user_id, '_wptelegram_messaging_sent', true ) ) {
 			return;
 		}
 
