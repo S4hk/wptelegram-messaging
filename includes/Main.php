@@ -168,15 +168,24 @@ class Main {
 			return;
 		}
 
-		// Prevent sending more than once to the same user (unless forced).
-		if ( ! $force && get_user_meta( $user_id, '_wptelegram_messaging_sent', true ) ) {
-			return;
-		}
-
-
 		// Get the user object.
 		$user = get_user_by( 'id', $user_id );
 		if ( ! $user ) {
+			return;
+		}
+
+		// Only send to genuinely NEW users (registered within the last 60 seconds).
+		// This prevents existing users who simply log in from receiving the welcome message.
+		if ( ! $force ) {
+			$registered_time = strtotime( $user->user_registered );
+			$now             = time();
+			if ( ( $now - $registered_time ) > 60 ) {
+				return;
+			}
+		}
+
+		// Also prevent sending more than once to the same user (safety net).
+		if ( ! $force && get_user_meta( $user_id, '_wptelegram_messaging_sent', true ) ) {
 			return;
 		}
 
