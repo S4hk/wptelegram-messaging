@@ -43,13 +43,6 @@ class Admin {
 	protected $version;
 
 	/**
-	 * The plugin options handler.
-	 *
-	 * @since    1.0.0
-	 * @access   protected
-	 * @var      Options    $options    The plugin options.
-	 */
-	protected $options;
 	 * Initialize the class and set its properties.
 	 *
 	 * @since    1.0.0
