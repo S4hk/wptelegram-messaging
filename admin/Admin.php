@@ -58,19 +58,30 @@ class Admin {
 	 * @since    1.0.0
 	 */
 	public function add_admin_menu() {
-		// Main Settings Page
-		add_submenu_page(
-			'wptelegram', // Parent menu slug from WP Telegram Core
+		// Main Menu (Parent)
+		add_menu_page(
 			esc_html__( 'Telegram Messaging', 'wptelegram-messaging' ), // Page title
 			esc_html__( 'Telegram Messaging', 'wptelegram-messaging' ), // Menu title
+			'manage_options', // Capability
+			'wptelegram-messaging', // Menu slug
+			[ $this, 'render_settings_page' ], // Callback
+			'dashicons-format-chat', // Icon
+			85 // Position
+		);
+
+		// Submenu 1: Welcome Message
+		add_submenu_page(
+			'wptelegram-messaging', // Parent menu slug
+			esc_html__( 'Welcome Message', 'wptelegram-messaging' ), // Page title
+			esc_html__( 'Welcome Message', 'wptelegram-messaging' ), // Menu title
 			'manage_options', // Capability
 			'wptelegram-messaging', // Menu slug
 			[ $this, 'render_settings_page' ] // Callback
 		);
 
-		// Bulk Messaging Page
+		// Submenu 2: Bulk Messaging
 		add_submenu_page(
-			'wptelegram', // Parent menu slug
+			'wptelegram-messaging', // Parent menu slug
 			esc_html__( 'Bulk Messaging', 'wptelegram-messaging' ),
 			esc_html__( 'Bulk Messaging', 'wptelegram-messaging' ),
 			'manage_options',
@@ -551,6 +562,66 @@ class Admin {
 				</div>
 			</div>
 			
+			<hr style="margin: 30px 0;">
+
+			<h2><?php esc_html_e( 'Available Placeholders', 'wptelegram-messaging' ); ?></h2>
+			<table class="wp-list-table widefat striped">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Placeholder', 'wptelegram-messaging' ); ?></th>
+						<th><?php esc_html_e( 'Description', 'wptelegram-messaging' ); ?></th>
+						<th><?php esc_html_e( 'Example', 'wptelegram-messaging' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><code>{site_name}</code></td>
+						<td><?php esc_html_e( 'Your website name', 'wptelegram-messaging' ); ?></td>
+						<td>My Awesome Blog</td>
+					</tr>
+					<tr>
+						<td><code>{site_description}</code></td>
+						<td><?php esc_html_e( 'Your website tagline/description', 'wptelegram-messaging' ); ?></td>
+						<td>Just another WordPress site</td>
+					</tr>
+					<tr>
+						<td><code>{user_name}</code></td>
+						<td><?php esc_html_e( 'User display name', 'wptelegram-messaging' ); ?></td>
+						<td>John Doe</td>
+					</tr>
+					<tr>
+						<td><code>{first_name}</code></td>
+						<td><?php esc_html_e( 'User first name', 'wptelegram-messaging' ); ?></td>
+						<td>John</td>
+					</tr>
+					<tr>
+						<td><code>{last_name}</code></td>
+						<td><?php esc_html_e( 'User last name', 'wptelegram-messaging' ); ?></td>
+						<td>Doe</td>
+					</tr>
+					<tr>
+						<td><code>{user_email}</code></td>
+						<td><?php esc_html_e( 'User email address', 'wptelegram-messaging' ); ?></td>
+						<td>john@example.com</td>
+					</tr>
+					<tr>
+						<td><code>{user_login}</code></td>
+						<td><?php esc_html_e( 'User login username', 'wptelegram-messaging' ); ?></td>
+						<td>johndoe</td>
+					</tr>
+					<tr>
+						<td><code>{site_url}</code></td>
+						<td><?php esc_html_e( 'Your website URL', 'wptelegram-messaging' ); ?></td>
+						<td>https://example.com</td>
+					</tr>
+					<tr>
+						<td><code>{admin_email}</code></td>
+						<td><?php esc_html_e( 'Admin email address', 'wptelegram-messaging' ); ?></td>
+						<td>admin@example.com</td>
+					</tr>
+				</tbody>
+			</table>
+			
 			<?php endif; ?>
 		</div>
 		<?php
@@ -704,7 +775,8 @@ class Admin {
 	 * @param string $hook The current admin page hook.
 	 */
 	public function enqueue_scripts( $hook ) {
-		if ( 'users.php' !== $hook ) {
+		// Load script on users page or any of our plugin's settings pages
+		if ( 'users.php' !== $hook && strpos( $hook, 'wptelegram-messaging' ) === false ) {
 			return;
 		}
 
@@ -714,6 +786,13 @@ class Admin {
 			[ 'jquery' ],
 			$this->version,
 			true
+		);
+
+		// Pass ajaxurl to the script explicitly just in case
+		wp_localize_script(
+			$this->plugin_name . '-admin',
+			'wptelegramMessagingAdmin',
+			[ 'ajaxurl' => admin_url( 'admin-ajax.php' ) ]
 		);
 
 		// Add some styles for the 'updating' state

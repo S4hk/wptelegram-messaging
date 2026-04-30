@@ -74,7 +74,7 @@
             $results.hide();
 
             $.ajax({
-                url: ajaxurl,
+                url: (typeof ajaxurl !== 'undefined') ? ajaxurl : wptelegramMessagingAdmin.ajaxurl,
                 type: 'POST',
                 data: {
                     action: 'wptelegram_messaging_send_bulk',
