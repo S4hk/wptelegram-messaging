@@ -136,6 +136,9 @@ class Admin {
 		// AJAX handler for manual sending
 		add_action( 'wp_ajax_wptelegram_messaging_send_manual', [ $this, 'handle_manual_send' ] );
 
+		// AJAX handler for bulk sending
+		add_action( 'wp_ajax_wptelegram_messaging_send_bulk', [ $this, 'handle_bulk_send' ] );
+
 		// Enqueue scripts
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_scripts' ] );
 	}
@@ -451,6 +454,57 @@ class Admin {
 					</tr>
 				</tbody>
 			</table>
+
+			<hr style="margin: 30px 0;">
+
+			<h2><?php esc_html_e( 'Bulk Messaging', 'wptelegram-messaging' ); ?></h2>
+			<p><?php esc_html_e( 'Send a custom message to all users with selected roles who have connected their Telegram account.', 'wptelegram-messaging' ); ?></p>
+			
+			<div id="wptelegram-messaging-bulk-form" style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; box-shadow: 0 1px 1px rgba(0,0,0,.04);">
+				<table class="form-table">
+					<tr>
+						<th scope="row"><label for="bulk_message"><?php esc_html_e( 'Message', 'wptelegram-messaging' ); ?></label></th>
+						<td>
+							<textarea id="bulk_message" rows="5" cols="50" class="large-text code" placeholder="<?php esc_attr_e( 'Enter your custom bulk message here...', 'wptelegram-messaging' ); ?>"></textarea>
+							<p class="description"><?php esc_html_e( 'Supports the same placeholders as the welcome message.', 'wptelegram-messaging' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Target Roles', 'wptelegram-messaging' ); ?></th>
+						<td>
+							<fieldset id="bulk_roles">
+								<?php
+								global $wp_roles;
+								foreach ( $wp_roles->roles as $role_key => $role_details ) {
+									echo '<label style="display: block; margin-bottom: 5px;">';
+									echo '<input type="checkbox" name="bulk_roles[]" value="' . esc_attr( $role_key ) . '" /> ';
+									echo esc_html( translate_user_role( $role_details['name'] ) );
+									echo '</label>';
+								}
+								?>
+							</fieldset>
+							<p class="description"><?php esc_html_e( 'Select which roles should receive this message. If none selected, message will NOT be sent.', 'wptelegram-messaging' ); ?></p>
+						</td>
+					</tr>
+				</table>
+				
+				<?php wp_nonce_field( 'wptelegram_messaging_bulk_send', 'bulk_send_nonce' ); ?>
+				<p class="submit">
+					<button type="button" id="wptelegram-messaging-send-bulk" class="button button-primary">
+						<?php esc_html_e( 'Send Bulk Message', 'wptelegram-messaging' ); ?>
+					</button>
+					<span class="spinner"></span>
+				</p>
+				
+				<div id="bulk-send-results" style="display: none; margin-top: 20px; padding: 10px; background: #f0f0f0; border-left: 4px solid #00a0d2;">
+					<p><strong><?php esc_html_e( 'Bulk Send Status:', 'wptelegram-messaging' ); ?></strong></p>
+					<ul style="margin: 0;">
+						<li><?php esc_html_e( 'Sent:', 'wptelegram-messaging' ); ?> <span class="sent-count">0</span></li>
+						<li><?php esc_html_e( 'Failed:', 'wptelegram-messaging' ); ?> <span class="failed-count">0</span></li>
+						<li><?php esc_html_e( 'Skipped (no Telegram):', 'wptelegram-messaging' ); ?> <span class="skipped-count">0</span></li>
+					</ul>
+				</div>
+			</div>
 		</div>
 		<?php
 	}
@@ -562,6 +616,38 @@ class Admin {
 			$msg    = $failed ? $failed : ( $error ? $error : __( 'Failed to send message. Check if bot is started.', 'wptelegram-messaging' ) );
 			wp_send_json_error( [ 'message' => $msg ] );
 		}
+	}
+
+	/**
+	 * Handle AJAX request for bulk message sending.
+	 *
+	 * @since    1.1.0
+	 */
+	public function handle_bulk_send() {
+		$message = isset( $_POST['message'] ) ? wp_kses_post( wp_unslash( $_POST['message'] ) ) : '';
+		$roles   = isset( $_POST['roles'] ) ? array_map( 'sanitize_text_field', (array) $_POST['roles'] ) : [];
+		$nonce   = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+
+		if ( ! wp_verify_nonce( $nonce, 'wptelegram_messaging_bulk_send' ) ) {
+			wp_send_json_error( [ 'message' => __( 'Invalid security token.', 'wptelegram-messaging' ) ] );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'wptelegram-messaging' ) ] );
+		}
+
+		if ( empty( $message ) ) {
+			wp_send_json_error( [ 'message' => __( 'Message cannot be empty.', 'wptelegram-messaging' ) ] );
+		}
+
+		if ( empty( $roles ) ) {
+			wp_send_json_error( [ 'message' => __( 'Please select at least one target role.', 'wptelegram-messaging' ) ] );
+		}
+
+		$main    = \WPTelegram\Messaging\includes\Main::instance();
+		$results = $main->send_bulk_message( $message, $roles );
+
+		wp_send_json_success( $results );
 	}
 
 	/**

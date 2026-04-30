@@ -170,10 +170,6 @@ class Main {
 			return;
 		}
 
-		// Check if welcome already sent (skip for forced sends).
-		if ( ! $force && get_user_meta( $user_id, '_wptelegram_messaging_sent', true ) ) {
-			return;
-		}
 
 		// Get the user object.
 		$user = get_user_by( 'id', $user_id );
@@ -332,7 +328,7 @@ class Main {
 	 * @param int    $user_id   WordPress user ID.
 	 * @return bool
 	 */
-	private function send_telegram_message( $chat_id, $message, $bot_token, $user_id ) {
+	public function send_telegram_message( $chat_id, $message, $bot_token, $user_id = 0 ) {
 		if ( empty( $chat_id ) || empty( $message ) || empty( $bot_token ) ) {
 			return false;
 		}
@@ -418,5 +414,56 @@ class Main {
 	 */
 	public function run() {
 		do_action( 'wptelegram_messaging_loaded' );
+	}
+	/**
+	 * Send a bulk message to all users with specific roles.
+	 *
+	 * @since    1.1.0
+	 * @param string $message      The message to send.
+	 * @param array  $roles        Array of role slugs to target.
+	 * @return array Results with 'sent' and 'failed' counts.
+	 */
+	public function send_bulk_message( $message, $roles = [] ) {
+		$settings  = get_option( 'wptelegram_messaging_settings', [] );
+		$bot_token = $this->resolve_bot_token( $settings );
+
+		$results = [ 'sent' => 0, 'failed' => 0, 'skipped' => 0 ];
+
+		if ( empty( $bot_token ) || empty( $message ) ) {
+			return $results;
+		}
+
+		// Build user query args.
+		$args = [
+			'meta_key'   => WPTELEGRAM_USER_ID_META_KEY,
+			'meta_compare' => 'EXISTS',
+			'number'     => -1,
+		];
+
+		if ( ! empty( $roles ) ) {
+			$args['role__in'] = $roles;
+		}
+
+		$users = get_users( $args );
+
+		foreach ( $users as $user ) {
+			$telegram_id = get_user_meta( $user->ID, WPTELEGRAM_USER_ID_META_KEY, true );
+			if ( empty( $telegram_id ) ) {
+				$results['skipped']++;
+				continue;
+			}
+
+			// Replace placeholders per user.
+			$personalized = $this->replace_placeholders( $message, $user );
+
+			$success = $this->send_telegram_message( $telegram_id, $personalized, $bot_token, $user->ID );
+			if ( $success ) {
+				$results['sent']++;
+			} else {
+				$results['failed']++;
+			}
+		}
+
+		return $results;
 	}
 }
