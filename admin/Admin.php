@@ -50,20 +50,16 @@ class Admin {
 	 * @var      Options    $options    The plugin options.
 	 */
 	protected $options;
-
-	/**
 	 * Initialize the class and set its properties.
 	 *
 	 * @since    1.0.0
 	 * @param string $plugin_name       The name of this plugin.
 	 * @param string $version    The version of this plugin.
-	 * @param Options $options   The plugin options handler.
 	 */
-	public function __construct( $plugin_name, $version, Options $options ) {
+	public function __construct( $plugin_name, $version ) {
 
 		$this->plugin_name = $plugin_name;
 		$this->version     = $version;
-		$this->options     = $options;
 	}
 
 	/**
@@ -115,11 +111,29 @@ class Admin {
 			'wptelegram_messaging_main'
 		);
 
+		// Bot Token field
+		add_settings_field(
+			'wptelegram_messaging_bot_token',
+			esc_html__( 'Bot Token', 'wptelegram-messaging' ),
+			[ $this, 'render_bot_token_field' ],
+			'wptelegram_messaging_settings_group',
+			'wptelegram_messaging_main'
+		);
+
 		// Message text field
 		add_settings_field(
 			'wptelegram_messaging_message',
 			esc_html__( 'Welcome Message', 'wptelegram-messaging' ),
 			[ $this, 'render_message_field' ],
+			'wptelegram_messaging_settings_group',
+			'wptelegram_messaging_main'
+		);
+
+		// Target Roles field
+		add_settings_field(
+			'wptelegram_messaging_target_roles',
+			esc_html__( 'Target Roles', 'wptelegram-messaging' ),
+			[ $this, 'render_target_roles_field' ],
 			'wptelegram_messaging_settings_group',
 			'wptelegram_messaging_main'
 		);
@@ -148,13 +162,24 @@ class Admin {
 			$input = [];
 		}
 
-		$settings = [];
+		$settings = get_option( 'wptelegram_messaging_settings', [] );
 
 		// Sanitize enable field
 		$settings['enable_welcome'] = isset( $input['enable_welcome'] ) ? 1 : 0;
 
+		// Sanitize bot token
+		if ( isset( $input['bot_token'] ) ) {
+			$settings['bot_token'] = sanitize_text_field( $input['bot_token'] );
+		}
+
 		// Sanitize message field
 		$settings['welcome_message'] = isset( $input['welcome_message'] ) ? wp_kses_post( $input['welcome_message'] ) : '';
+
+		// Sanitize target roles
+		$settings['target_roles'] = [];
+		if ( isset( $input['target_roles'] ) && is_array( $input['target_roles'] ) ) {
+			$settings['target_roles'] = array_map( 'sanitize_text_field', $input['target_roles'] );
+		}
 
 		return $settings;
 	}
@@ -189,6 +214,42 @@ class Admin {
 		<p class="description">
 			<?php esc_html_e( 'When disabled, no welcome messages will be sent. Existing messages already sent will not be affected.', 'wptelegram-messaging' ); ?>
 		</p>
+		<?php
+	}
+
+	/**
+	 * Render bot token field.
+	 *
+	 * @since    1.1.0
+	 */
+	public function render_bot_token_field() {
+		$settings = get_option( 'wptelegram_messaging_settings', [] );
+		$token    = isset( $settings['bot_token'] ) ? $settings['bot_token'] : '';
+
+		$has_external_token = false;
+		if ( function_exists( 'WPTG_Login' ) && ! empty( WPTG_Login()->options()->get( 'bot_token' ) ) ) {
+			$has_external_token = true;
+		} elseif ( function_exists( 'WPTG' ) && ! empty( WPTG()->options()->get( 'bot_token' ) ) ) {
+			$has_external_token = true;
+		}
+
+		if ( $has_external_token ) {
+			echo '<p style="color: green;"><strong>✓ ' . esc_html__( 'Bot Token automatically inherited from WP Telegram.', 'wptelegram-messaging' ) . '</strong></p>';
+			echo '<p class="description">' . esc_html__( 'You do not need to enter a token here unless you want to use a different bot.', 'wptelegram-messaging' ) . '</p>';
+		}
+		?>
+		<input 
+			type="password" 
+			name="wptelegram_messaging_settings[bot_token]" 
+			value="<?php echo esc_attr( $token ); ?>" 
+			class="regular-text"
+			placeholder="<?php esc_attr_e( 'Enter Bot Token', 'wptelegram-messaging' ); ?>"
+		/>
+		<?php if ( ! $has_external_token ) : ?>
+			<p class="description">
+				<?php esc_html_e( 'WP Telegram is not installed or configured. Please enter your Telegram Bot Token here.', 'wptelegram-messaging' ); ?>
+			</p>
+		<?php endif; ?>
 		<?php
 	}
 
@@ -228,6 +289,32 @@ class Admin {
 			</div>
 		</details>
 		<?php
+	}
+
+	/**
+	 * Render target roles field.
+	 *
+	 * @since    1.1.0
+	 */
+	public function render_target_roles_field() {
+		global $wp_roles;
+		if ( ! isset( $wp_roles ) ) {
+			$wp_roles = new \WP_Roles();
+		}
+
+		$settings = get_option( 'wptelegram_messaging_settings', [] );
+		$target_roles = isset( $settings['target_roles'] ) ? (array) $settings['target_roles'] : [];
+		
+		echo '<fieldset>';
+		foreach ( $wp_roles->roles as $role_key => $role_details ) {
+			$checked = in_array( $role_key, $target_roles, true ) ? 'checked="checked"' : '';
+			echo '<label style="display: block; margin-bottom: 5px;">';
+			echo '<input type="checkbox" name="wptelegram_messaging_settings[target_roles][]" value="' . esc_attr( $role_key ) . '" ' . $checked . ' /> ';
+			echo esc_html( translate_user_role( $role_details['name'] ) );
+			echo '</label>';
+		}
+		echo '</fieldset>';
+		echo '<p class="description">' . esc_html__( 'Select which user roles should receive the welcome message. If none are selected, ALL roles will receive it.', 'wptelegram-messaging' ) . '</p>';
 	}
 
 	/**
