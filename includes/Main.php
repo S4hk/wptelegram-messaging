@@ -64,8 +64,6 @@ class Main {
 	 */
 	protected $version;
 
-
-
 	/**
 	 * Main class Instance.
 	 *
@@ -111,29 +109,9 @@ class Main {
 		$this->plugin_name  = 'wptelegram-messaging';
 		$this->title        = 'WP Telegram Messaging';
 
-		$this->load_dependencies();
 		$this->set_locale();
 		$this->define_admin_hooks();
 		$this->define_public_hooks();
-	}
-
-	/**
-	 * Load the required dependencies for this plugin.
-	 *
-	 * Include the following files that make up the plugin:
-	 *
-	 * - Loader. Orchestrates the hooks of the plugin.
-	 * - I18n. Defines internationalization functionality.
-	 * - Admin. Defines all hooks for the admin area.
-	 * - Frontend. Defines all hooks for the public side of the site.
-	 *
-	 * Create an instance of the loader which will be used throughout this plugin
-	 * to register the hooks with WordPress.
-	 *
-	 * @since    1.0.0
-	 */
-	private function load_dependencies() {
-		// Dependencies loaded.
 	}
 
 	/**
@@ -168,29 +146,32 @@ class Main {
 	 * @since    1.0.0
 	 */
 	private function define_public_hooks() {
-		// Hook into WP Telegram Login after user login.
+		// Hook into WP Telegram Login after user login (fires for both new and returning users).
 		add_action( 'wptelegram_login_after_user_login', [ $this, 'send_welcome_on_login' ] );
 
-		// Hook into standard WordPress registration.
-		add_action( 'user_register', [ $this, 'send_welcome_on_login' ] );
-
-		// Hook into WP Telegram Login after data is saved (most reliable for new registrations).
+		// Hook into WP Telegram Login after user data is saved (most reliable for new registrations).
 		add_action( 'wptelegram_login_after_save_user_data', [ $this, 'send_welcome_on_login' ] );
 	}
 
 	/**
-	 * Send welcome message when user logs in.
+	 * Send welcome message when user registers/logs in.
 	 *
 	 * @since    1.0.0
-	 * @param int $user_id The WordPress user ID.
+	 * @param int  $user_id The WordPress user ID.
+	 * @param bool $force   Whether to force send even if already sent.
 	 */
 	public function send_welcome_on_login( $user_id, $force = false ) {
-		// Get plugin settings directly.
-		$settings = get_option( 'wptelegram_messaging_settings', [] );
+		// Get plugin settings.
+		$settings   = get_option( 'wptelegram_messaging_settings', [] );
 		$is_enabled = isset( $settings['enable_welcome'] ) ? $settings['enable_welcome'] : 1;
 
 		// Check if feature is enabled.
 		if ( ! $force && ! $is_enabled ) {
+			return;
+		}
+
+		// Check if welcome already sent (skip for forced sends).
+		if ( ! $force && get_user_meta( $user_id, '_wptelegram_messaging_sent', true ) ) {
 			return;
 		}
 
@@ -200,13 +181,11 @@ class Main {
 			return;
 		}
 
-		// Role Check
+		// Role Check: if target roles are configured, only send to matching roles.
 		$target_roles = isset( $settings['target_roles'] ) ? (array) $settings['target_roles'] : [];
 		if ( ! empty( $target_roles ) ) {
 			$user_roles = (array) $user->roles;
-			$intersect  = array_intersect( $user_roles, $target_roles );
-			if ( empty( $intersect ) ) {
-				// User does not have any of the target roles, abort.
+			if ( empty( array_intersect( $user_roles, $target_roles ) ) ) {
 				return;
 			}
 		}
@@ -218,37 +197,11 @@ class Main {
 			return;
 		}
 
-		// Get bot token.
-		$bot_token = isset( $settings['bot_token'] ) ? $settings['bot_token'] : '';
-		
-		// Try WP Telegram Login first if setting is empty.
-		if ( empty( $bot_token ) && function_exists( 'WPTG_Login' ) ) {
-			$bot_token = WPTG_Login()->options()->get( 'bot_token' );
-		}
-
-		// Try WP Telegram core if still empty.
-		if ( empty( $bot_token ) && function_exists( 'WPTG' ) ) {
-			$bot_token = WPTG()->options()->get( 'bot_token' );
-		}
-
-		// Direct fallbacks if functions fail.
-		if ( empty( $bot_token ) ) {
-			$login_opts = get_option( 'wptelegram_login', [] );
-			$bot_token  = isset( $login_opts['bot_token'] ) ? $login_opts['bot_token'] : '';
-		}
-
-		if ( empty( $bot_token ) ) {
-			$core_opts = get_option( 'wptelegram', [] );
-			$bot_token = isset( $core_opts['bot_token'] ) ? $core_opts['bot_token'] : '';
-		}
+		// Resolve bot token (plugin settings > WP Telegram Login > WP Telegram core).
+		$bot_token = $this->resolve_bot_token( $settings );
 
 		if ( empty( $bot_token ) ) {
 			update_user_meta( $user_id, '_wptelegram_messaging_failed', __( 'Bot token not found in settings.', 'wptelegram-messaging' ) );
-			return;
-		}
-
-		// Check if welcome already sent.
-		if ( ! $force && get_user_meta( $user_id, '_wptelegram_messaging_sent', true ) ) {
 			return;
 		}
 
@@ -274,6 +227,40 @@ class Main {
 	}
 
 	/**
+	 * Resolve the bot token from multiple sources.
+	 *
+	 * Priority: plugin own settings > WP Telegram Login > WP Telegram Core.
+	 *
+	 * @since    1.1.0
+	 * @param array $settings The plugin settings.
+	 * @return string The bot token or empty string.
+	 */
+	private function resolve_bot_token( $settings ) {
+		// 1. Check own settings first.
+		if ( ! empty( $settings['bot_token'] ) ) {
+			return $settings['bot_token'];
+		}
+
+		// 2. Try WP Telegram Login.
+		if ( function_exists( 'WPTG_Login' ) ) {
+			$token = WPTG_Login()->options()->get( 'bot_token' );
+			if ( ! empty( $token ) ) {
+				return $token;
+			}
+		}
+
+		// 3. Try WP Telegram core.
+		if ( function_exists( 'WPTG' ) ) {
+			$token = WPTG()->options()->get( 'bot_token' );
+			if ( ! empty( $token ) ) {
+				return $token;
+			}
+		}
+
+		return '';
+	}
+
+	/**
 	 * Get default welcome message.
 	 *
 	 * @since    1.0.0
@@ -285,7 +272,8 @@ class Main {
 		$user_name = ! empty( $user->first_name ) ? $user->first_name : $user->display_name;
 
 		return sprintf(
-			__( "🎉 Welcome to %s, %s!\n\nThank you for registering. We're excited to have you on board. Feel free to explore our website and get in touch if you have any questions.", 'wptelegram-messaging' ),
+			/* translators: %1$s: site name, %2$s: user name */
+			__( "🎉 Welcome to %1\$s, %2\$s!\n\nThank you for registering. We're excited to have you on board. Feel free to explore our website and get in touch if you have any questions.", 'wptelegram-messaging' ),
 			esc_html( $site_name ),
 			esc_html( $user_name )
 		);
@@ -333,58 +321,32 @@ class Main {
 	}
 
 	/**
-	 * Send message to Telegram user.
+	 * Send message to Telegram user via the Telegram Bot API.
+	 *
+	 * Uses wp_remote_post directly to avoid any dependency on external classes.
 	 *
 	 * @since    1.0.0
-	 * @param int    $chat_id      Telegram user ID.
-	 * @param string $message      Message text.
-	 * @param string $bot_token    Bot token.
-	 * @param int    $user_id      WordPress user ID.
-	 * @return bool|void
+	 * @param string $chat_id   Telegram user ID.
+	 * @param string $message   Message text.
+	 * @param string $bot_token Bot token.
+	 * @param int    $user_id   WordPress user ID.
+	 * @return bool
 	 */
 	private function send_telegram_message( $chat_id, $message, $bot_token, $user_id ) {
 		if ( empty( $chat_id ) || empty( $message ) || empty( $bot_token ) ) {
 			return false;
 		}
 
-		// Build the API URL.
-		$api_url = "https://api.telegram.org/bot{$bot_token}/sendMessage";
+		$api_url = 'https://api.telegram.org/bot' . $bot_token . '/sendMessage';
 
-		$args = [
-			'chat_id'    => (string) $chat_id, // Cast to string to handle large 64-bit IDs
-			'text'       => wp_kses_post( $message ),
-			'parse_mode' => 'HTML',
-		];
-
-		// Check if we can use BotAPI.
-		if ( class_exists( '\WPTelegram\BotAPI\API' ) ) {
-			try {
-				$telegram_api = new \WPTelegram\BotAPI\API( $bot_token );
-				$response = $telegram_api->sendMessage( $args );
-
-				if ( $telegram_api->is_success( $response ) ) {
-					update_user_meta( $user_id, '_wptelegram_messaging_sent', '1' );
-					update_user_meta( $user_id, '_wptelegram_messaging_sent_time', current_time( 'mysql' ) );
-					do_action( 'wptelegram_messaging_message_sent', $user_id, $response );
-					return true;
-				} else {
-					$error_msg = ! empty( $response['description'] ) ? $response['description'] : 'Unknown error';
-					update_user_meta( $user_id, '_wptelegram_messaging_failed', $error_msg );
-					do_action( 'wptelegram_messaging_message_failed', $user_id, $response, $error_msg );
-					return false;
-				}
-			} catch ( \Exception $e ) {
-				update_user_meta( $user_id, '_wptelegram_messaging_error', $e->getMessage() );
-				do_action( 'wptelegram_messaging_message_exception', $user_id, $e );
-				return false;
-			}
-		}
-
-		// Fallback to native wp_remote_post
 		$response = wp_remote_post(
 			$api_url,
 			[
-				'body'    => $args,
+				'body'    => [
+					'chat_id'    => (string) $chat_id,
+					'text'       => $message,
+					'parse_mode' => 'HTML',
+				],
 				'timeout' => 15,
 			]
 		);
@@ -398,16 +360,35 @@ class Main {
 		$data = json_decode( $body, true );
 
 		if ( isset( $data['ok'] ) && $data['ok'] ) {
+			// Success.
 			update_user_meta( $user_id, '_wptelegram_messaging_sent', '1' );
 			update_user_meta( $user_id, '_wptelegram_messaging_sent_time', current_time( 'mysql' ) );
+
+			/**
+			 * Fires after welcome message is sent successfully.
+			 *
+			 * @param int   $user_id The WordPress user ID.
+			 * @param array $data    The Telegram API response data.
+			 */
 			do_action( 'wptelegram_messaging_message_sent', $user_id, $data );
+
 			return true;
-		} else {
-			$error_msg = ! empty( $data['description'] ) ? $data['description'] : 'Unknown error';
-			update_user_meta( $user_id, '_wptelegram_messaging_failed', $error_msg );
-			do_action( 'wptelegram_messaging_message_failed', $user_id, $data, $error_msg );
-			return false;
 		}
+
+		// Failure.
+		$error_msg = ! empty( $data['description'] ) ? $data['description'] : __( 'Unknown Telegram API error', 'wptelegram-messaging' );
+		update_user_meta( $user_id, '_wptelegram_messaging_failed', $error_msg );
+
+		/**
+		 * Fires when welcome message fails to send.
+		 *
+		 * @param int    $user_id   The WordPress user ID.
+		 * @param array  $data      The Telegram API response data.
+		 * @param string $error_msg The error message.
+		 */
+		do_action( 'wptelegram_messaging_message_failed', $user_id, $data, $error_msg );
+
+		return false;
 	}
 
 	/**
@@ -429,8 +410,6 @@ class Main {
 	public function get_version() {
 		return $this->version;
 	}
-
-
 
 	/**
 	 * Run the plugin.

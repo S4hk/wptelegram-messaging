@@ -11,8 +11,6 @@
 
 namespace WPTelegram\Messaging\admin;
 
-use WPSocio\WPUtils\Options;
-
 /**
  * The admin-specific functionality of the plugin.
  *
@@ -46,11 +44,10 @@ class Admin {
 	 * Initialize the class and set its properties.
 	 *
 	 * @since    1.0.0
-	 * @param string $plugin_name       The name of this plugin.
-	 * @param string $version    The version of this plugin.
+	 * @param string $plugin_name The name of this plugin.
+	 * @param string $version     The version of this plugin.
 	 */
 	public function __construct( $plugin_name, $version ) {
-
 		$this->plugin_name = $plugin_name;
 		$this->version     = $version;
 	}
@@ -219,15 +216,11 @@ class Admin {
 		$settings = get_option( 'wptelegram_messaging_settings', [] );
 		$token    = isset( $settings['bot_token'] ) ? $settings['bot_token'] : '';
 
-		$has_external_token = false;
-		if ( function_exists( 'WPTG_Login' ) && ! empty( WPTG_Login()->options()->get( 'bot_token' ) ) ) {
-			$has_external_token = true;
-		} elseif ( function_exists( 'WPTG' ) && ! empty( WPTG()->options()->get( 'bot_token' ) ) ) {
-			$has_external_token = true;
-		}
+		// Check if an external token is available.
+		$external_token = $this->get_external_bot_token();
 
-		if ( $has_external_token ) {
-			echo '<p style="color: green;"><strong>✓ ' . esc_html__( 'Bot Token automatically inherited from WP Telegram.', 'wptelegram-messaging' ) . '</strong></p>';
+		if ( ! empty( $external_token ) ) {
+			echo '<p style="color: green;"><strong>&#10003; ' . esc_html__( 'Bot Token automatically inherited from WP Telegram.', 'wptelegram-messaging' ) . '</strong></p>';
 			echo '<p class="description">' . esc_html__( 'You do not need to enter a token here unless you want to use a different bot.', 'wptelegram-messaging' ) . '</p>';
 		}
 		?>
@@ -238,12 +231,41 @@ class Admin {
 			class="regular-text"
 			placeholder="<?php esc_attr_e( 'Enter Bot Token', 'wptelegram-messaging' ); ?>"
 		/>
-		<?php if ( ! $has_external_token ) : ?>
-			<p class="description">
-				<?php esc_html_e( 'WP Telegram is not installed or configured. Please enter your Telegram Bot Token here.', 'wptelegram-messaging' ); ?>
+		<?php if ( empty( $external_token ) && empty( $token ) ) : ?>
+			<p class="description" style="color: #dc3232;">
+				<?php esc_html_e( 'No bot token found. Please enter your Telegram Bot Token here, or install and configure WP Telegram / WP Telegram Login.', 'wptelegram-messaging' ); ?>
 			</p>
 		<?php endif; ?>
 		<?php
+	}
+
+	/**
+	 * Try to get bot token from WP Telegram Login or WP Telegram core.
+	 *
+	 * Uses safe function_exists checks to avoid fatal errors if those
+	 * plugins are not installed.
+	 *
+	 * @since    1.1.0
+	 * @return string Bot token or empty string.
+	 */
+	private function get_external_bot_token() {
+		// Try WP Telegram Login.
+		if ( function_exists( 'WPTG_Login' ) ) {
+			$token = WPTG_Login()->options()->get( 'bot_token' );
+			if ( ! empty( $token ) ) {
+				return $token;
+			}
+		}
+
+		// Try WP Telegram core.
+		if ( function_exists( 'WPTG' ) ) {
+			$token = WPTG()->options()->get( 'bot_token' );
+			if ( ! empty( $token ) ) {
+				return $token;
+			}
+		}
+
+		return '';
 	}
 
 	/**
@@ -295,9 +317,9 @@ class Admin {
 			$wp_roles = new \WP_Roles();
 		}
 
-		$settings = get_option( 'wptelegram_messaging_settings', [] );
+		$settings     = get_option( 'wptelegram_messaging_settings', [] );
 		$target_roles = isset( $settings['target_roles'] ) ? (array) $settings['target_roles'] : [];
-		
+
 		echo '<fieldset>';
 		foreach ( $wp_roles->roles as $role_key => $role_details ) {
 			$checked = in_array( $role_key, $target_roles, true ) ? 'checked="checked"' : '';
@@ -321,43 +343,15 @@ class Admin {
 			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'wptelegram-messaging' ) );
 		}
 
-		// Check if WP Telegram Login is active
-		if ( ! function_exists( 'WPTG_Login' ) ) {
-			?>
-			<div class="wrap">
-				<h1><?php esc_html_e( 'Telegram Messaging', 'wptelegram-messaging' ); ?></h1>
-				<div class="notice notice-error">
-					<p>
-						<?php 
-						echo wp_kses_post(
-							__( '<strong>WP Telegram Login plugin is required.</strong> Please install and activate WP Telegram Login plugin to use this feature.', 'wptelegram-messaging' )
-						);
-						?>
-					</p>
-				</div>
-			</div>
-			<?php
-			return;
-		}
+		$settings  = get_option( 'wptelegram_messaging_settings', [] );
+		$own_token = isset( $settings['bot_token'] ) ? $settings['bot_token'] : '';
 
-		// Check if bot token is configured
-		$bot_token = WPTG_Login()->options()->get( 'bot_token' );
-		if ( empty( $bot_token ) ) {
-			?>
-			<div class="wrap">
-				<h1><?php esc_html_e( 'Telegram Messaging', 'wptelegram-messaging' ); ?></h1>
-				<div class="notice notice-warning">
-					<p>
-						<?php 
-						echo wp_kses_post(
-							__( '<strong>Bot Token not configured.</strong> Please configure a valid Telegram bot token in WP Telegram or WP Telegram Login settings.', 'wptelegram-messaging' )
-						);
-						?>
-					</p>
-				</div>
-			</div>
-			<?php
-		}
+		// Check if WP Telegram Login is active
+		$has_wptg_login = function_exists( 'WPTG_Login' );
+
+		// Check if any token is available
+		$external_token = $this->get_external_bot_token();
+		$has_any_token  = ! empty( $own_token ) || ! empty( $external_token );
 
 		?>
 		<div class="wrap">
@@ -365,6 +359,30 @@ class Admin {
 			<p style="font-size: 14px; color: #666;">
 				<?php esc_html_e( 'Configure automatic welcome messages for users who register via WP Telegram Login.', 'wptelegram-messaging' ); ?>
 			</p>
+
+			<?php if ( ! $has_wptg_login ) : ?>
+				<div class="notice notice-warning">
+					<p>
+						<?php
+						echo wp_kses_post(
+							__( '<strong>WP Telegram Login plugin is not active.</strong> For automatic welcome messages on registration, please install and activate WP Telegram Login. You can still configure settings and send manual messages if you provide a Bot Token below.', 'wptelegram-messaging' )
+						);
+						?>
+					</p>
+				</div>
+			<?php endif; ?>
+
+			<?php if ( ! $has_any_token ) : ?>
+				<div class="notice notice-error">
+					<p>
+						<?php
+						echo wp_kses_post(
+							__( '<strong>No Bot Token configured.</strong> Please enter a Telegram Bot Token below, or configure one in WP Telegram / WP Telegram Login settings.', 'wptelegram-messaging' )
+						);
+						?>
+					</p>
+				</div>
+			<?php endif; ?>
 
 			<form method="post" action="options.php">
 				<?php
@@ -436,6 +454,7 @@ class Admin {
 		</div>
 		<?php
 	}
+
 	/**
 	 * Add custom column to users table.
 	 *
@@ -515,7 +534,7 @@ class Admin {
 	 */
 	public function handle_manual_send() {
 		$user_id = isset( $_GET['user_id'] ) ? absint( $_GET['user_id'] ) : 0;
-		$nonce   = isset( $_GET['_wpnonce'] ) ? $_GET['_wpnonce'] : '';
+		$nonce   = isset( $_GET['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ) : '';
 
 		if ( ! wp_verify_nonce( $nonce, 'wptelegram_messaging_manual_send_' . $user_id ) ) {
 			wp_send_json_error( [ 'message' => __( 'Invalid security token.', 'wptelegram-messaging' ) ] );
@@ -525,12 +544,12 @@ class Admin {
 			wp_send_json_error( [ 'message' => __( 'Insufficient permissions.', 'wptelegram-messaging' ) ] );
 		}
 
-		// Use the Main class to send the message
+		// Clear previous error/failure meta before retrying.
+		delete_user_meta( $user_id, '_wptelegram_messaging_failed' );
+		delete_user_meta( $user_id, '_wptelegram_messaging_error' );
+
+		// Use the Main class to send the message (force = true).
 		$main = \WPTelegram\Messaging\includes\Main::instance();
-		
-		// Force send even if already sent
-		delete_user_meta( $user_id, '_wptelegram_messaging_sent' );
-		
 		$main->send_welcome_on_login( $user_id, true );
 
 		$sent = get_user_meta( $user_id, '_wptelegram_messaging_sent', true );
