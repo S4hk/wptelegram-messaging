@@ -58,6 +58,7 @@ class Admin {
 	 * @since    1.0.0
 	 */
 	public function add_admin_menu() {
+		// Main Settings Page
 		add_submenu_page(
 			'wptelegram', // Parent menu slug from WP Telegram Core
 			esc_html__( 'Telegram Messaging', 'wptelegram-messaging' ), // Page title
@@ -65,6 +66,16 @@ class Admin {
 			'manage_options', // Capability
 			'wptelegram-messaging', // Menu slug
 			[ $this, 'render_settings_page' ] // Callback
+		);
+
+		// Bulk Messaging Page
+		add_submenu_page(
+			'wptelegram', // Parent menu slug
+			esc_html__( 'Bulk Messaging', 'wptelegram-messaging' ),
+			esc_html__( 'Bulk Messaging', 'wptelegram-messaging' ),
+			'manage_options',
+			'wptelegram-messaging-bulk',
+			[ $this, 'render_bulk_messaging_page' ]
 		);
 	}
 
@@ -454,19 +465,50 @@ class Admin {
 					</tr>
 				</tbody>
 			</table>
+		</div>
+		<?php
+	}
 
-			<hr style="margin: 30px 0;">
+	/**
+	 * Render the bulk messaging page.
+	 *
+	 * @since    1.1.0
+	 */
+	public function render_bulk_messaging_page() {
+		// Check user capabilities
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'wptelegram-messaging' ) );
+		}
 
-			<h2><?php esc_html_e( 'Bulk Messaging', 'wptelegram-messaging' ); ?></h2>
+		$settings  = get_option( 'wptelegram_messaging_settings', [] );
+		$own_token = isset( $settings['bot_token'] ) ? $settings['bot_token'] : '';
+		$external_token = $this->get_external_bot_token();
+		$has_any_token  = ! empty( $own_token ) || ! empty( $external_token );
+
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Bulk Messaging', 'wptelegram-messaging' ); ?></h1>
 			<p><?php esc_html_e( 'Send a custom message to all users with selected roles who have connected their Telegram account.', 'wptelegram-messaging' ); ?></p>
+			
+			<?php if ( ! $has_any_token ) : ?>
+				<div class="notice notice-error">
+					<p>
+						<?php
+						echo wp_kses_post(
+							__( '<strong>No Bot Token configured.</strong> Please enter a Telegram Bot Token in the Telegram Messaging settings page, or configure one in WP Telegram.', 'wptelegram-messaging' )
+						);
+						?>
+					</p>
+				</div>
+			<?php else : ?>
 			
 			<div id="wptelegram-messaging-bulk-form" style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; box-shadow: 0 1px 1px rgba(0,0,0,.04);">
 				<table class="form-table">
 					<tr>
 						<th scope="row"><label for="bulk_message"><?php esc_html_e( 'Message', 'wptelegram-messaging' ); ?></label></th>
 						<td>
-							<textarea id="bulk_message" rows="5" cols="50" class="large-text code" placeholder="<?php esc_attr_e( 'Enter your custom bulk message here...', 'wptelegram-messaging' ); ?>"></textarea>
-							<p class="description"><?php esc_html_e( 'Supports the same placeholders as the welcome message.', 'wptelegram-messaging' ); ?></p>
+							<textarea id="bulk_message" rows="8" cols="50" class="large-text code" placeholder="<?php esc_attr_e( 'Enter your custom bulk message here...', 'wptelegram-messaging' ); ?>"></textarea>
+							<p class="description"><?php esc_html_e( 'Supports standard placeholders: {site_name}, {user_name}, {first_name}, {last_name}, {user_email}, {user_login}, {site_url}', 'wptelegram-messaging' ); ?></p>
 						</td>
 					</tr>
 					<tr>
@@ -475,6 +517,9 @@ class Admin {
 							<fieldset id="bulk_roles">
 								<?php
 								global $wp_roles;
+								if ( ! isset( $wp_roles ) ) {
+									$wp_roles = new \WP_Roles();
+								}
 								foreach ( $wp_roles->roles as $role_key => $role_details ) {
 									echo '<label style="display: block; margin-bottom: 5px;">';
 									echo '<input type="checkbox" name="bulk_roles[]" value="' . esc_attr( $role_key ) . '" /> ';
@@ -493,18 +538,20 @@ class Admin {
 					<button type="button" id="wptelegram-messaging-send-bulk" class="button button-primary">
 						<?php esc_html_e( 'Send Bulk Message', 'wptelegram-messaging' ); ?>
 					</button>
-					<span class="spinner"></span>
+					<span class="spinner" style="float: none; margin: 4px 10px 0;"></span>
 				</p>
 				
-				<div id="bulk-send-results" style="display: none; margin-top: 20px; padding: 10px; background: #f0f0f0; border-left: 4px solid #00a0d2;">
-					<p><strong><?php esc_html_e( 'Bulk Send Status:', 'wptelegram-messaging' ); ?></strong></p>
-					<ul style="margin: 0;">
-						<li><?php esc_html_e( 'Sent:', 'wptelegram-messaging' ); ?> <span class="sent-count">0</span></li>
-						<li><?php esc_html_e( 'Failed:', 'wptelegram-messaging' ); ?> <span class="failed-count">0</span></li>
-						<li><?php esc_html_e( 'Skipped (no Telegram):', 'wptelegram-messaging' ); ?> <span class="skipped-count">0</span></li>
+				<div id="bulk-send-results" style="display: none; margin-top: 20px; padding: 15px; background: #f0f0f0; border-left: 4px solid #00a0d2;">
+					<p style="margin-top: 0;"><strong><?php esc_html_e( 'Bulk Send Status:', 'wptelegram-messaging' ); ?></strong></p>
+					<ul style="margin: 0; font-size: 14px;">
+						<li><span style="color: #46b450;">&#10003;</span> <?php esc_html_e( 'Sent successfully:', 'wptelegram-messaging' ); ?> <strong><span class="sent-count">0</span></strong></li>
+						<li><span style="color: #dc3232;">&#10007;</span> <?php esc_html_e( 'Failed:', 'wptelegram-messaging' ); ?> <strong><span class="failed-count">0</span></strong></li>
+						<li><span style="color: #666;">&#9866;</span> <?php esc_html_e( 'Skipped (no Telegram connected):', 'wptelegram-messaging' ); ?> <strong><span class="skipped-count">0</span></strong></li>
 					</ul>
 				</div>
 			</div>
+			
+			<?php endif; ?>
 		</div>
 		<?php
 	}

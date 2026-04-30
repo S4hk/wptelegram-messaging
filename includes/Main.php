@@ -435,8 +435,13 @@ class Main {
 
 		// Build user query args.
 		$args = [
-			'meta_key'   => WPTELEGRAM_USER_ID_META_KEY,
-			'meta_compare' => 'EXISTS',
+			'meta_query' => [
+				[
+					'key'     => WPTELEGRAM_USER_ID_META_KEY,
+					'value'   => '',
+					'compare' => '!=',
+				]
+			],
 			'number'     => -1,
 		];
 
