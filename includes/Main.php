@@ -146,10 +146,8 @@ class Main {
 	 * @since    1.0.0
 	 */
 	private function define_public_hooks() {
-		// Hook into WP Telegram Login after user login (fires for both new and returning users).
-		add_action( 'wptelegram_login_after_user_login', [ $this, 'send_welcome_on_login' ] );
-
-		// Hook into WP Telegram Login after user data is saved (most reliable for new registrations).
+		// Hook into WP Telegram Login after user data is saved (fires after new registration or profile update).
+		// We use the "sent" meta check in the handler to ensure it only sends once per user.
 		add_action( 'wptelegram_login_after_save_user_data', [ $this, 'send_welcome_on_login' ] );
 	}
 
@@ -167,6 +165,11 @@ class Main {
 
 		// Check if feature is enabled.
 		if ( ! $force && ! $is_enabled ) {
+			return;
+		}
+
+		// Prevent sending more than once to the same user (unless forced).
+		if ( ! $force && get_user_meta( $user_id, '_wptelegram_messaging_sent', true ) ) {
 			return;
 		}
 
